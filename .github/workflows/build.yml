@@ -47,17 +47,10 @@ jobs:
       - name: Unit tests
         continue-on-error: true
         run: |
-          UDID=$(xcrun simctl list devices available -j \
-            | python3 -c "import json,sys; d=json.load(sys.stdin)['devices']; \
-ids=[x['udid'] for k,v in d.items() for x in v if 'iPhone' in x['name']]; \
-print(ids[0] if ids else '')")
+          UDID=$(xcrun simctl list devices available -j | python3 -c 'import json,sys; d=json.load(sys.stdin)["devices"]; ids=[x["udid"] for v in d.values() for x in v if "iPhone" in x["name"]]; print(ids[0] if ids else "")')
           if [ -z "$UDID" ]; then echo "No iPhone simulator available; skipping tests."; exit 0; fi
           echo "Testing on simulator $UDID"
-          xcodebuild test \
-            -project HermesNative.xcodeproj \
-            -scheme HermesNative \
-            -destination "id=$UDID" \
-            CODE_SIGNING_ALLOWED=NO
+          xcodebuild test -project HermesNative.xcodeproj -scheme HermesNative -destination "id=$UDID" CODE_SIGNING_ALLOWED=NO
 
       - name: Archive (unsigned)
         run: |
