@@ -13,7 +13,22 @@
       "tintColor": "6B66F5",
       "category": "developer",
       "screenshotURLs": [],
-      "versions": []
+      "versions": [
+        {
+          "version": "0.1.3",
+          "date": "2026-06-05",
+          "localizedDescription": "Automated build 0.1.3",
+          "downloadURL": "https://github.com/SenulMapa/hermes-native/releases/download/v0.1.3/HermesNative.ipa",
+          "size": 78257,
+          "minOSVersion": "26.0"
+        }
+      ],
+      "version": "0.1.3",
+      "versionDate": "2026-06-05",
+      "versionDescription": "Automated build 0.1.3",
+      "downloadURL": "https://github.com/SenulMapa/hermes-native/releases/download/v0.1.3/HermesNative.ipa",
+      "size": 78257,
+      "minOSVersion": "26.0"
     }
   ]
 }
