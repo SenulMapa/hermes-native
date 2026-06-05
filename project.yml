@@ -1,0 +1,69 @@
+# XcodeGen spec — generates HermesNative.xcodeproj on the macOS CI runner.
+# Authored on Linux; never hand-edit a pbxproj.
+name: HermesNative
+options:
+  bundleIdPrefix: com.senulmapa
+  deploymentTarget:
+    iOS: "26.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+
+settings:
+  base:
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    SWIFT_VERSION: "5.10"
+    # Unsigned build — AltStore re-signs on device with the user's free Apple ID.
+    CODE_SIGN_STYLE: Manual
+    CODE_SIGNING_REQUIRED: "NO"
+    CODE_SIGNING_ALLOWED: "NO"
+    CODE_SIGN_IDENTITY: ""
+
+packages:
+  HermesGlass:
+    path: Packages/HermesGlass
+  HermesAPI:
+    path: Packages/HermesAPI
+
+targets:
+  HermesNative:
+    type: application
+    platform: iOS
+    sources:
+      - path: HermesNative
+    dependencies:
+      - package: HermesGlass
+      - package: HermesAPI
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.senulmapa.hermesnative
+        GENERATE_INFOPLIST_FILE: "YES"
+        INFOPLIST_KEY_CFBundleDisplayName: "Hermes"
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: "YES"
+        INFOPLIST_KEY_UILaunchScreen_Generation: "YES"
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+        TARGETED_DEVICE_FAMILY: "1,2"
+
+  HermesNativeTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: HermesNativeTests
+    dependencies:
+      - target: HermesNative
+      - package: HermesAPI
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: "YES"
+        PRODUCT_BUNDLE_IDENTIFIER: com.senulmapa.hermesnative.tests
+
+schemes:
+  HermesNative:
+    build:
+      targets:
+        HermesNative: all
+        HermesNativeTests: [test]
+    test:
+      targets:
+        - HermesNativeTests

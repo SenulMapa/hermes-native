@@ -1,0 +1,115 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "source.json"
+      - "**/*.md"
+      - "docs/**"
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-15
+    env:
+      VERSION: 0.1.${{ github.run_number }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select latest stable Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Show toolchain
+        run: |
+          xcodebuild -version
+          swift --version
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Resolve packages
+        run: xcodebuild -resolvePackageDependencies -project HermesNative.xcodeproj
+
+      - name: Unit tests
+        continue-on-error: true
+        run: |
+          UDID=$(xcrun simctl list devices available -j \
+            | python3 -c "import json,sys; d=json.load(sys.stdin)['devices']; \
+ids=[x['udid'] for k,v in d.items() for x in v if 'iPhone' in x['name']]; \
+print(ids[0] if ids else '')")
+          if [ -z "$UDID" ]; then echo "No iPhone simulator available; skipping tests."; exit 0; fi
+          echo "Testing on simulator $UDID"
+          xcodebuild test \
+            -project HermesNative.xcodeproj \
+            -scheme HermesNative \
+            -destination "id=$UDID" \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Archive (unsigned)
+        run: |
+          xcodebuild archive \
+            -project HermesNative.xcodeproj \
+            -scheme HermesNative \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath build/HermesNative.xcarchive \
+            MARKETING_VERSION="$VERSION" \
+            CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" CODE_SIGN_ENTITLEMENTS=""
+
+      - name: Package unsigned IPA
+        run: |
+          chmod +x ci/make-ipa.sh
+          ci/make-ipa.sh build/HermesNative.xcarchive build/HermesNative.ipa
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: HermesNative-ipa
+          path: build/HermesNative.ipa
+
+      # --- Release + OTA source update only on pushes to main ---
+      - name: Create GitHub Release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ env.VERSION }}
+          name: Hermes Native v${{ env.VERSION }}
+          files: build/HermesNative.ipa
+          generate_release_notes: true
+
+      - name: Update AltStore source.json
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          DOWNLOAD_URL: https://github.com/${{ github.repository }}/releases/download/v${{ env.VERSION }}/HermesNative.ipa
+        run: |
+          chmod +x ci/gen-source.sh
+          VERSION="$VERSION" DOWNLOAD_URL="$DOWNLOAD_URL" IPA_PATH=build/HermesNative.ipa \
+            NOTES="Automated build $VERSION" ci/gen-source.sh
+
+      - name: Commit source.json
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if ! git diff --quiet -- source.json; then
+            git add source.json
+            git commit -m "ci: publish v$VERSION to AltStore source [skip ci]"
+            git push
+          else
+            echo "source.json unchanged"
+          fi

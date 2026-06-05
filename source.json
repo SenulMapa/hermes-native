@@ -1,0 +1,19 @@
+{
+  "name": "Hermes Native",
+  "identifier": "com.senulmapa.hermesnative.source",
+  "subtitle": "Your Hermes agent, natively.",
+  "apps": [
+    {
+      "name": "Hermes",
+      "bundleIdentifier": "com.senulmapa.hermesnative",
+      "developerName": "Senul Mapa",
+      "subtitle": "Terminal-grade, mobile-shaped.",
+      "localizedDescription": "Native SwiftUI client for the Hermes agent: streaming chat, full SSH terminal, cron, projects and more. Liquid Glass throughout, iOS 26+.",
+      "iconURL": "https://raw.githubusercontent.com/SenulMapa/hermes-native/main/assets/icon.png",
+      "tintColor": "6B66F5",
+      "category": "developer",
+      "screenshotURLs": [],
+      "versions": []
+    }
+  ]
+}
