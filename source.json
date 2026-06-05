@@ -15,6 +15,14 @@
       "screenshotURLs": [],
       "versions": [
         {
+          "version": "0.1.5",
+          "date": "2026-06-05",
+          "localizedDescription": "Automated build 0.1.5",
+          "downloadURL": "https://github.com/SenulMapa/hermes-native/releases/download/v0.1.5/HermesNative.ipa",
+          "size": 78259,
+          "minOSVersion": "26.0"
+        },
+        {
           "version": "0.1.4",
           "date": "2026-06-05",
           "localizedDescription": "Automated build 0.1.4",
@@ -31,11 +39,11 @@
           "minOSVersion": "26.0"
         }
       ],
-      "version": "0.1.4",
+      "version": "0.1.5",
       "versionDate": "2026-06-05",
-      "versionDescription": "Automated build 0.1.4",
-      "downloadURL": "https://github.com/SenulMapa/hermes-native/releases/download/v0.1.4/HermesNative.ipa",
-      "size": 78257,
+      "versionDescription": "Automated build 0.1.5",
+      "downloadURL": "https://github.com/SenulMapa/hermes-native/releases/download/v0.1.5/HermesNative.ipa",
+      "size": 78259,
       "minOSVersion": "26.0"
     }
   ]
