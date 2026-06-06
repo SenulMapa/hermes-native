@@ -34,6 +34,48 @@ final class ChatTests: XCTestCase {
         XCTAssertEqual(resp.messages[2].toolName, "bash")
     }
 
+    func testDecodeMessageWithoutNewFieldsIsBackwardCompatible() throws {
+        // A v14-style message (no attachments/feedback/reply) must still decode.
+        let json = Data("""
+        {"id":1,"role":"user","content":"hello","timestamp":1.0}
+        """.utf8)
+        let m = try JSONDecoder().decode(ChatMessage.self, from: json)
+        XCTAssertEqual(m.attachments, [])
+        XCTAssertNil(m.feedbackScore)
+        XCTAssertNil(m.replyToId)
+        XCTAssertTrue(m.isPersisted)
+    }
+
+    func testDecodeMessageWithTier1Fields() throws {
+        let json = Data("""
+        {"id":7,"role":"user","content":"see this","timestamp":1.0,
+         "reply_to_id":3,"feedback_score":1,
+         "attachments":[{"name":"a.jpg","mime":"image/jpeg","url":"/api/sessions/s/attachments/a.jpg"}]}
+        """.utf8)
+        let m = try JSONDecoder().decode(ChatMessage.self, from: json)
+        XCTAssertEqual(m.replyToId, 3)
+        XCTAssertEqual(m.feedbackScore, 1)
+        XCTAssertEqual(m.attachments.count, 1)
+        XCTAssertEqual(m.attachments[0].name, "a.jpg")
+        XCTAssertTrue(m.attachments[0].isImage)
+    }
+
+    func testLocalMessageIsNotPersisted() {
+        let local = ChatMessage(id: -1, role: .user, content: "draft")
+        XCTAssertFalse(local.isPersisted)
+    }
+
+    func testDecodeUploadedAttachment() throws {
+        let json = Data("""
+        {"name":"x.png","path":"/home/u/.hermes/attachments/s/x.png",
+         "url":"/api/sessions/s/attachments/x.png","mime":"image/png"}
+        """.utf8)
+        let up = try JSONDecoder().decode(UploadedAttachment.self, from: json)
+        XCTAssertEqual(up.path, "/home/u/.hermes/attachments/s/x.png")
+        XCTAssertEqual(up.attachment.name, "x.png")
+        XCTAssertTrue(up.attachment.isImage)
+    }
+
     func testGatewayEventMapping() {
         XCTAssertEqual(HermesGateway.map(type: "message.delta", payload: ["text": "ab"]),
                        .messageDelta("ab"))
