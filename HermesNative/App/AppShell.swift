@@ -11,12 +11,7 @@ struct AppShell: View {
                 InboxView()
             }
             Tab("Terminal", systemImage: "terminal") {
-                PlaceholderView(
-                    title: "Terminal",
-                    systemImage: "terminal",
-                    detail: "Full SSH PTY — vim, htop, lazygit.",
-                    phase: "Phase 2"
-                )
+                HostsView()
             }
             Tab("Cron", systemImage: "clock.arrow.trianglehead.counterclockwise.rotate.90") {
                 PlaceholderView(

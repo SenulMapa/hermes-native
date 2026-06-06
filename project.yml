@@ -24,6 +24,8 @@ packages:
     path: Packages/HermesGlass
   HermesAPI:
     path: Packages/HermesAPI
+  HermesTerminal:
+    path: Packages/HermesTerminal
 
 targets:
   HermesNative:
@@ -34,6 +36,7 @@ targets:
     dependencies:
       - package: HermesGlass
       - package: HermesAPI
+      - package: HermesTerminal
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.senulmapa.hermesnative

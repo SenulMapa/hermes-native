@@ -45,7 +45,6 @@ jobs:
         run: xcodebuild -resolvePackageDependencies -project HermesNative.xcodeproj
 
       - name: Unit tests
-        continue-on-error: true
         run: |
           chmod +x ci/run-tests.sh
           ci/run-tests.sh
