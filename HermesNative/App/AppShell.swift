@@ -14,12 +14,7 @@ struct AppShell: View {
                 HostsView()
             }
             Tab("Cron", systemImage: "clock.arrow.trianglehead.counterclockwise.rotate.90") {
-                PlaceholderView(
-                    title: "Cron",
-                    systemImage: "clock",
-                    detail: "Scheduled tasks, plain-English schedules.",
-                    phase: "Phase 4"
-                )
+                CronView()
             }
             Tab("Projects", systemImage: "folder") {
                 PlaceholderView(
