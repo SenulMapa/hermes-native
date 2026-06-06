@@ -33,10 +33,6 @@ targets:
     platform: iOS
     sources:
       - path: HermesNative
-        excludes:
-          - "Info.plist"
-    info:
-      path: HermesNative/Info.plist
     dependencies:
       - package: HermesGlass
       - package: HermesAPI
@@ -44,7 +40,11 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.senulmapa.hermesnative
-        GENERATE_INFOPLIST_FILE: "NO"
+        # Auto-generate Info.plist from INFOPLIST_KEY_* build settings.
+        # This keeps CFBundleVersion / CFBundleShortVersionString in sync
+        # with MARKETING_VERSION / CURRENT_PROJECT_VERSION (AltStore's
+        # VerificationError fires when they don't match source.json).
+        GENERATE_INFOPLIST_FILE: "YES"
         INFOPLIST_KEY_CFBundleDisplayName: "Hermes"
         INFOPLIST_KEY_NSMicrophoneUsageDescription: "Hermes uses the microphone for voice input to your agent."
         INFOPLIST_KEY_NSSpeechRecognitionUsageDescription: "Hermes transcribes your speech on-device for voice messages."
@@ -54,6 +54,13 @@ targets:
         INFOPLIST_KEY_UILaunchScreen_Generation: "YES"
         INFOPLIST_KEY_UISupportedInterfaceOrientations: "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+        # ATS exception: allow plain HTTP to RFC1918 / link-local / Tailscale
+        # / .local hosts so the app can talk to a self-hosted Hermes server
+        # that's only reachable on the LAN or the tailnet. NSAllowsLocalNetworking
+        # is scoped to non-public domains per Apple's docs — public-internet
+        # HTTP is still blocked. Nested plist keys via build settings use
+        # INFOPLIST_KEY_<top>__<sub> (double underscore is the separator).
+        INFOPLIST_KEY_NSAppTransportSecurity__NSAllowsLocalNetworking: "YES"
         TARGETED_DEVICE_FAMILY: "1,2"
 
   HermesNativeTests:
