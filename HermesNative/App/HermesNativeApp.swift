@@ -24,9 +24,9 @@ struct HermesNativeApp: App {
                 .preferredColorScheme(appearance.scheme.colorScheme)
                 .overlay { if appLock.enabled && !appLock.unlocked { LockScreen() } }
                 .task(id: appLock.unlocked) { await appLock.authenticate() }
-        }
-        .onChange(of: scenePhase) { _, phase in
-            if phase == .background { appLock.lock() }
+                .onChange(of: scenePhase) { _, phase in
+                    if phase == .background { appLock.lock() }
+                }
         }
     }
 }

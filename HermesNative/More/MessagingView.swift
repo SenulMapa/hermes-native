@@ -14,8 +14,8 @@ final class MessagingStore {
 
     func load() async {
         do { platforms = try await client.messagingPlatforms() }
-        catch let e as HermesError { error = e.userMessage }
-        catch { error = error.localizedDescription }
+        catch let e as HermesError { self.error = e.userMessage }
+        catch { self.error = error.localizedDescription }
     }
     func toggle(_ p: MessagingPlatform) async {
         try? await client.setMessagingPlatform(p.id, enabled: !p.enabled)
