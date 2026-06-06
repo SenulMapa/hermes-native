@@ -53,6 +53,31 @@ Tailscale) and, optionally, a session token from the Hermes web dashboard. The
 app verifies reachability via the public `/api/auth/providers` endpoint and your
 token via `/api/auth/me`.
 
-## Status
+## Status — all PRD phases implemented
 
-Phase 0 (foundation + OTA) — see tasks and specs. Chat (Phase 1) is next.
+| Phase | Feature | Notes |
+|---|---|---|
+| 0 | Foundation + OTA (Liquid Glass shell, CI, AltStore source) | ✅ |
+| 1 | Chat — sessions, live JSON-RPC streaming, markdown/code | ✅ `/api/ws` gateway |
+| 2 | SSH PTY terminal | ✅ SwiftTerm + Apple swift-nio-ssh, TOFU host-key pinning; needs on-device tuning |
+| 3 | Models / settings / usage / appearance | ✅ |
+| 4 | Cron management | ✅ `/api/cron/jobs` |
+| 5 | Tool-call cards & sub-agents, approval gates | ✅ |
+| 6 | Projects + local file editor | ✅ (remote SFTP browsing is future work) |
+| 7 | Voice I/O (on-device) + local notifications | ✅ |
+| 8 | Server search + Telegram/messaging bridge + memory viewer | ✅ (skills/browser/vision need server endpoints not yet exposed) |
+| 9 | Biometric app-lock + accessibility | ✅ |
+
+### Deferred (require a paid Apple Developer account / extra targets)
+
+The free-Apple-ID + AltStore distribution model can't sign iCloud/CloudKit
+entitlements, and Watch/native-macOS need separate targets. So **iCloud sync
+(§14), a native macOS app (§18), and Apple Watch (§19)** are intentionally not
+enabled in this build. The iOS app runs on Apple-silicon Macs as an iPad app.
+Performance targets (§22) are met structurally (lazy lists, on-demand loads,
+streaming) but not benchmarked here.
+
+> Verification: every phase is compiled by CI (`xcodebuild archive`, iOS 26) and
+> the `HermesAPI` logic is unit-tested on the host. Runtime behaviour that needs
+> a device or a live authenticated server (terminal TUIs, live streaming, voice)
+> should be validated on-device after install.

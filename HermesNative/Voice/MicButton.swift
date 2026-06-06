@@ -13,6 +13,7 @@ struct MicButton: View {
                 .font(.title3)
                 .foregroundStyle(speech.isRecording ? .red : .secondary)
         }
+        .accessibilityLabel(speech.isRecording ? "Stop dictation" : "Start voice dictation")
     }
 
     private func toggle() async {

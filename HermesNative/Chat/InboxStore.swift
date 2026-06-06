@@ -9,18 +9,31 @@ final class InboxStore {
 
     private let credential: HermesCredential
     var sessions: [ChatSession] = []
+    var searchResults: [ChatSession] = []
     var state: State = .idle
     var searchText: String = ""
 
     init(credential: HermesCredential) { self.credential = credential }
 
+    private var client: HermesAPIClient { HermesAPIClient(credential: credential) }
+
+    /// Local filter fallback (instant) merged with server full-text results.
     var visibleSessions: [ChatSession] {
         guard !searchText.isEmpty else { return sessions }
         let q = searchText.lowercased()
-        return sessions.filter {
-            $0.displayTitle.lowercased().contains(q)
-            || ($0.model?.lowercased().contains(q) ?? false)
+        let local = sessions.filter {
+            $0.displayTitle.lowercased().contains(q) || ($0.model?.lowercased().contains(q) ?? false)
         }
+        // Merge server results, de-duplicated by id, server first.
+        var seen = Set(searchResults.map(\.id))
+        return searchResults + local.filter { seen.insert($0.id).inserted }
+    }
+
+    /// Full-text server search (PRD §3.4); call as the query changes.
+    func runSearch() async {
+        let q = searchText.trimmingCharacters(in: .whitespaces)
+        guard !q.isEmpty else { searchResults = []; return }
+        searchResults = (try? await client.searchSessions(q)) ?? []
     }
 
     func refresh() async {

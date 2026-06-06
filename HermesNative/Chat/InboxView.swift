@@ -63,6 +63,7 @@ struct InboxView: View {
         }
         .listStyle(.plain)
         .searchable(text: $store.searchText, prompt: "Search sessions")
+        .onChange(of: store.searchText) { _, _ in Task { await store.runSearch() } }
         .refreshable { await store.refresh() }
     }
 

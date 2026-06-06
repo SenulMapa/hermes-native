@@ -8,6 +8,8 @@ struct HermesNativeApp: App {
     @State private var appearance = AppearanceStore()
     @State private var speech = SpeechService()
     @State private var notifications = NotificationService()
+    @State private var appLock = AppLock()
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some Scene {
         WindowGroup {
@@ -16,9 +18,31 @@ struct HermesNativeApp: App {
                 .environment(appearance)
                 .environment(speech)
                 .environment(notifications)
+                .environment(appLock)
                 .tint(appearance.accentColor)
                 .hermesTheme(appearance.theme)
                 .preferredColorScheme(appearance.scheme.colorScheme)
+                .overlay { if appLock.enabled && !appLock.unlocked { LockScreen() } }
+                .task(id: appLock.unlocked) { await appLock.authenticate() }
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .background { appLock.lock() }
+        }
+    }
+}
+
+/// Full-screen biometric gate shown while the app is locked.
+struct LockScreen: View {
+    @Environment(AppLock.self) private var appLock
+    var body: some View {
+        ZStack {
+            Rectangle().fill(.ultraThinMaterial).ignoresSafeArea()
+            VStack(spacing: 16) {
+                Image(systemName: "lock.fill").font(.system(size: 48, weight: .thin))
+                Text("Hermes is locked").font(.headline)
+                Button("Unlock") { Task { await appLock.authenticate() } }
+                    .buttonStyle(.glassProminent)
+            }
         }
     }
 }

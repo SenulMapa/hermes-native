@@ -102,7 +102,7 @@ final class ConversationModel {
             streamingThinking += t; isStreaming = true
         case .toolStart(let name, let context):
             activeTools.append(name)
-            messages.append(makeMessage(role: .tool, content: context, toolName: name))
+            messages.append(makeMessage(role: .tool, content: context ?? "", toolName: name))
         case .toolGenerating:
             break
         case .toolComplete(let name):

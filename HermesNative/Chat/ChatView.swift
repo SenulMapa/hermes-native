@@ -122,11 +122,13 @@ struct ChatView: View {
                     Image(systemName: "stop.circle.fill").font(.title2)
                 }
                 .tint(.red)
+                .accessibilityLabel("Stop generating")
             } else {
                 Button { convo.send() } label: {
                     Image(systemName: "arrow.up.circle.fill").font(.title2)
                 }
                 .disabled(!convo.canSend)
+                .accessibilityLabel("Send message")
             }
         }
         .padding(Tokens.Space.md)

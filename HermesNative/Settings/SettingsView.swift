@@ -7,6 +7,7 @@ struct SettingsView: View {
     @Environment(AppModel.self) private var model
     @Environment(AppearanceStore.self) private var appearance
     @Environment(NotificationService.self) private var notifications
+    @Environment(AppLock.self) private var appLock
     @State private var settings: SettingsStore?
 
     var body: some View {
@@ -19,7 +20,9 @@ struct SettingsView: View {
                         usageCard(settings)
                     }
                     appearanceCard
+                    securityCard
                     notificationsCard
+                    moreCard
                     aboutCard
                 }
                 .padding(Tokens.Space.lg)
@@ -149,6 +152,37 @@ struct SettingsView: View {
             }
         }
         .task { await notifications.refreshStatus() }
+    }
+
+    private var securityCard: some View {
+        @Bindable var appLock = appLock
+        return GlassCard {
+            VStack(alignment: .leading, spacing: Tokens.Space.sm) {
+                Text("Security").font(.headline)
+                Toggle("Require Face ID / Touch ID", isOn: $appLock.enabled)
+                    .disabled(!appLock.biometryAvailable)
+                if !appLock.biometryAvailable {
+                    Text("Biometrics not available on this device.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder private var moreCard: some View {
+        if let cred = model.credential {
+            GlassCard {
+                VStack(alignment: .leading, spacing: Tokens.Space.sm) {
+                    Text("More").font(.headline)
+                    NavigationLink { MessagingView(credential: cred) } label: {
+                        Label("Telegram & messaging", systemImage: "message")
+                    }
+                    NavigationLink { MemoryView(credential: cred) } label: {
+                        Label("Memory", systemImage: "brain")
+                    }
+                }
+            }
+        }
     }
 
     private var aboutCard: some View {
