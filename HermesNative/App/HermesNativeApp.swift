@@ -6,12 +6,16 @@ import HermesGlass
 struct HermesNativeApp: App {
     @State private var model = AppModel(store: KeychainCredentialStore())
     @State private var appearance = AppearanceStore()
+    @State private var speech = SpeechService()
+    @State private var notifications = NotificationService()
 
     var body: some Scene {
         WindowGroup {
             RootView()
                 .environment(model)
                 .environment(appearance)
+                .environment(speech)
+                .environment(notifications)
                 .tint(appearance.accentColor)
                 .hermesTheme(appearance.theme)
                 .preferredColorScheme(appearance.scheme.colorScheme)

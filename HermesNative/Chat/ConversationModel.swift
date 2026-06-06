@@ -12,12 +12,18 @@ final class ConversationModel {
     private var eventTask: Task<Void, Never>?
     private var tempCounter = -1
 
+    struct PendingApproval: Identifiable, Equatable {
+        let id: String
+        let summary: String
+    }
+
     var messages: [ChatMessage] = []
     var draft: String = ""
     var isStreaming = false
     var streamingText = ""
     var streamingThinking = ""
     var activeTools: [String] = []
+    var pendingApproval: PendingApproval?
     var loadError: String?
     var note: String?
 
@@ -72,6 +78,12 @@ final class ConversationModel {
         finishStreaming()
     }
 
+    func respond(approved: Bool) {
+        guard let approval = pendingApproval else { return }
+        gateway?.respondApproval(id: approval.id, approved: approved)
+        pendingApproval = nil
+    }
+
     // MARK: - Event handling
 
     private func handle(_ event: GatewayEvent) {
@@ -88,15 +100,16 @@ final class ConversationModel {
             finishStreaming()
         case .thinkingDelta(let t):
             streamingThinking += t; isStreaming = true
-        case .toolStart(let name, _):
+        case .toolStart(let name, let context):
             activeTools.append(name)
+            messages.append(makeMessage(role: .tool, content: context, toolName: name))
         case .toolGenerating:
             break
         case .toolComplete(let name):
             if let n = name, let i = activeTools.firstIndex(of: n) { activeTools.remove(at: i) }
             else if !activeTools.isEmpty { activeTools.removeLast() }
-        case .approvalRequest(_, let summary):
-            note = "Approval requested: \(summary ?? "action") — approvals land in Phase 5."
+        case .approvalRequest(let id, let summary):
+            pendingApproval = PendingApproval(id: id ?? "", summary: summary ?? "Approve this action?")
         case .status(let s):
             note = s.isEmpty ? nil : s
         case .error(let m):
@@ -112,9 +125,9 @@ final class ConversationModel {
         streamingText = ""; streamingThinking = ""; activeTools = []; isStreaming = false
     }
 
-    private func makeMessage(role: MessageRole, content: String) -> ChatMessage {
+    private func makeMessage(role: MessageRole, content: String, toolName: String? = nil) -> ChatMessage {
         tempCounter -= 1
-        return ChatMessage(id: tempCounter, role: role, content: content,
+        return ChatMessage(id: tempCounter, role: role, content: content, toolName: toolName,
                            timestamp: Date().timeIntervalSince1970)
     }
 }

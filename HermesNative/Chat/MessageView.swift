@@ -6,6 +6,7 @@ import HermesGlass
 struct MessageView: View {
     let message: ChatMessage
     @Environment(\.hermesTheme) private var theme
+    @Environment(SpeechService.self) private var speech
 
     var body: some View {
         switch message.role {
@@ -29,26 +30,48 @@ struct MessageView: View {
 
     private var assistantBlock: some View {
         VStack(alignment: .leading, spacing: Tokens.Space.sm) {
-            Label("Valerie", systemImage: "sparkle")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(theme.accent)
+            HStack {
+                Label("Valerie", systemImage: "sparkle")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(theme.accent)
+                Spacer()
+                Button {
+                    if speech.isSpeaking { speech.stopSpeaking() }
+                    else { speech.speak(message.content ?? "") }
+                } label: {
+                    Image(systemName: speech.isSpeaking ? "speaker.wave.2.fill" : "speaker.wave.2")
+                        .font(.caption)
+                }
+                .buttonStyle(.borderless)
+                .tint(.secondary)
+            }
             MarkdownMessage(message.content ?? "")
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    private static let subAgents: Set<String> = ["maya", "vigil", "thursday", "valerie"]
+
+    private var isSubAgent: Bool {
+        guard let name = message.toolName?.lowercased() else { return false }
+        return Self.subAgents.contains(name)
+    }
+
     private var toolRow: some View {
-        HStack(spacing: Tokens.Space.sm) {
-            Image(systemName: "wrench.and.screwdriver.fill")
-            Text(message.toolName ?? "tool").font(.caption.monospaced())
-            if let c = message.content, !c.isEmpty {
-                Text("·").foregroundStyle(.secondary)
-                Text(c).font(.caption).lineLimit(1).foregroundStyle(.secondary)
+        GlassCard(cornerRadius: Tokens.Radius.control, padding: Tokens.Space.md) {
+            HStack(alignment: .top, spacing: Tokens.Space.sm) {
+                Image(systemName: isSubAgent ? "person.2.fill" : "wrench.and.screwdriver.fill")
+                    .foregroundStyle(isSubAgent ? theme.accent : .secondary)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(isSubAgent ? "\(message.toolName?.capitalized ?? "Agent")" : (message.toolName ?? "tool"))
+                        .font(.caption.weight(.semibold).monospaced())
+                    if let c = message.content, !c.isEmpty {
+                        Text(c).font(.caption2).foregroundStyle(.secondary).lineLimit(3)
+                    }
+                }
+                Spacer(minLength: 0)
             }
         }
-        .padding(.horizontal, Tokens.Space.md)
-        .padding(.vertical, Tokens.Space.sm)
-        .glassEffect(.regular, in: .capsule)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 

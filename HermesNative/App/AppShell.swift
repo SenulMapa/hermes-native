@@ -17,12 +17,7 @@ struct AppShell: View {
                 CronView()
             }
             Tab("Projects", systemImage: "folder") {
-                PlaceholderView(
-                    title: "Projects",
-                    systemImage: "folder",
-                    detail: "Files, terminal, git & cost per project.",
-                    phase: "Phase 6"
-                )
+                ProjectsView()
             }
             Tab("Settings", systemImage: "gearshape") {
                 SettingsView()

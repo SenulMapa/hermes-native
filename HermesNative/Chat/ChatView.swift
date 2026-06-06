@@ -12,6 +12,9 @@ struct ChatView: View {
         VStack(spacing: 0) {
             if let convo {
                 transcript(convo)
+                if let approval = convo.pendingApproval {
+                    approvalBar(convo, approval: approval)
+                }
                 composer(convo)
             } else {
                 ProgressView().frame(maxHeight: .infinity)
@@ -82,9 +85,32 @@ struct ChatView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    private func approvalBar(_ convo: ConversationModel, approval: ConversationModel.PendingApproval) -> some View {
+        VStack(alignment: .leading, spacing: Tokens.Space.sm) {
+            Label("Approval required", systemImage: "lock.shield")
+                .font(.caption.weight(.semibold))
+            Text(approval.summary).font(.subheadline)
+            HStack(spacing: Tokens.Space.md) {
+                Button(role: .destructive) { convo.respond(approved: false) } label: {
+                    Text("Deny").frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.glass)
+                Button { convo.respond(approved: true) } label: {
+                    Text("Approve").frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.glassProminent)
+            }
+        }
+        .padding(Tokens.Space.md)
+        .glassEffect(.regular.tint(.orange.opacity(0.2)), in: .rect(cornerRadius: Tokens.Radius.card))
+        .padding(.horizontal, Tokens.Space.md)
+    }
+
     private func composer(_ convo: ConversationModel) -> some View {
         @Bindable var convo = convo
         return HStack(spacing: Tokens.Space.sm) {
+            MicButton(convo: convo)
+
             TextField("Message Hermes…", text: $convo.draft, axis: .vertical)
                 .lineLimit(1...5)
                 .padding(.horizontal, Tokens.Space.md)

@@ -6,6 +6,7 @@ import HermesGlass
 struct SettingsView: View {
     @Environment(AppModel.self) private var model
     @Environment(AppearanceStore.self) private var appearance
+    @Environment(NotificationService.self) private var notifications
     @State private var settings: SettingsStore?
 
     var body: some View {
@@ -18,6 +19,7 @@ struct SettingsView: View {
                         usageCard(settings)
                     }
                     appearanceCard
+                    notificationsCard
                     aboutCard
                 }
                 .padding(Tokens.Space.lg)
@@ -128,6 +130,25 @@ struct SettingsView: View {
                 }
             }
         }
+    }
+
+    private var notificationsCard: some View {
+        GlassCard {
+            VStack(alignment: .leading, spacing: Tokens.Space.sm) {
+                Text("Notifications").font(.headline)
+                HStack {
+                    StatusPill(notifications.authorized ? .ok("Enabled") : .bad("Off"))
+                    Spacer()
+                    if !notifications.authorized {
+                        Button("Enable") { Task { await notifications.requestAuthorization() } }
+                            .buttonStyle(.glass)
+                    }
+                }
+                Text("Local alerts for cron results and finished sub-agents. Remote push requires server setup.")
+                    .font(.footnote).foregroundStyle(.secondary)
+            }
+        }
+        .task { await notifications.refreshStatus() }
     }
 
     private var aboutCard: some View {
