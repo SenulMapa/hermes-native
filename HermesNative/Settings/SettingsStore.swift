@@ -29,7 +29,7 @@ final class SettingsStore {
     func setModel(_ id: String) async {
         let client = HermesAPIClient(credential: credential)
         do { try await client.setModel(id); currentModel = id }
-        catch let e as HermesError { error = e.userMessage }
-        catch { error = error.localizedDescription }
+        catch let e as HermesError { self.error = e.userMessage }
+        catch { self.error = error.localizedDescription }
     }
 }
