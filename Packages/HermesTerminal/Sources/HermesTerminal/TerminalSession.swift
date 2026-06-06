@@ -1,10 +1,7 @@
 import Foundation
-import NIOCore
-import NIOSSH
-import Citadel
 
-/// Drives one interactive SSH PTY session via Citadel, bridging bytes to/from a
-/// SwiftTerm view. UI feeds happen on the main actor.
+/// Drives one interactive SSH PTY session (Apple swift-nio-ssh under the hood),
+/// bridging bytes to/from a SwiftTerm view. UI feeds happen on the main thread.
 @MainActor
 @Observable
 public final class TerminalSession {
@@ -18,9 +15,7 @@ public final class TerminalSession {
 
     private let host: SSHHost
     private let password: String
-    private var client: SSHClient?
-    private var stdin: TTYStdinWriter?
-    private var runTask: Task<Void, Never>?
+    private let connection = SSHConnection()
     private var cols = 80
     private var rows = 25
 
@@ -34,54 +29,35 @@ public final class TerminalSession {
         self.cols = max(cols, 1)
         self.rows = max(rows, 1)
         state = .connecting
-        runTask = Task { await run() }
+        Task { await run() }
     }
 
     private func run() async {
         do {
-            let client = try await SSHClient.connect(
-                host: host.host,
-                port: host.port,
-                authenticationMethod: .passwordBased(username: host.username, password: password),
-                hostKeyValidator: .acceptAnything(),
-                reconnect: .never
-            )
-            self.client = client
-            state = .connected
-
-            let pty = SSHChannelRequestEvent.PseudoTerminalRequest(
-                wantReply: true,
-                term: "xterm-256color",
-                terminalCharacterWidth: cols,
-                terminalRowHeight: rows,
-                terminalPixelWidth: 0,
-                terminalPixelHeight: 0,
-                terminalModes: SSHTerminalModes([:])
-            )
-
-            try await client.withPTY(pty) { [weak self] inbound, outbound in
-                await MainActor.run { self?.stdin = outbound }
-                for try await chunk in inbound {
-                    let buffer: ByteBuffer
-                    switch chunk {
-                    case .stdout(let b): buffer = b
-                    case .stderr(let b): buffer = b
+            try await connection.connect(
+                host: host.host, port: host.port,
+                username: host.username, password: password,
+                cols: cols, rows: rows,
+                serverAuth: TOFUHostKeyValidator(host: host.host),
+                onData: { bytes in
+                    // NIO thread → main, FIFO-preserving for stable rendering.
+                    DispatchQueue.main.async { [weak self] in self?.onStdout?(bytes) }
+                },
+                onError: { error in
+                    DispatchQueue.main.async { [weak self] in
+                        self?.state = .failed(String(describing: error))
                     }
-                    let bytes = Array(buffer.readableBytesView)
-                    await MainActor.run { self?.onStdout?(bytes) }
                 }
-            }
-            state = .closed
+            )
+            state = .connected
         } catch {
-            state = .failed(error.localizedDescription)
+            state = .failed(String(describing: error))
         }
     }
 
     /// Send user keystrokes to the remote shell.
     public func write(_ bytes: [UInt8]) {
-        guard let stdin else { return }
-        let buf = ByteBuffer(bytes: bytes)
-        Task { try? await stdin.write(buf) }
+        connection.write(bytes)
     }
 
     /// Propagate a local size change to the remote PTY (SIGWINCH).
@@ -89,17 +65,11 @@ public final class TerminalSession {
         guard cols > 0, rows > 0, (cols != self.cols || rows != self.rows) else { return }
         self.cols = cols
         self.rows = rows
-        guard let stdin else { return }
-        Task { try? await stdin.changeSize(cols: cols, rows: rows, pixelWidth: 0, pixelHeight: 0) }
+        connection.resize(cols: cols, rows: rows)
     }
 
     public func stop() {
-        runTask?.cancel()
-        runTask = nil
-        let c = client
-        client = nil
-        stdin = nil
-        Task { try? await c?.close() }
+        connection.close()
         state = .closed
     }
 }

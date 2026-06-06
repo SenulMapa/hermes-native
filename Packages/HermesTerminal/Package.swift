@@ -8,19 +8,22 @@ let package = Package(
         .library(name: "HermesTerminal", targets: ["HermesTerminal"]),
     ],
     dependencies: [
+        // SwiftTerm: the established iOS terminal emulator.
         .package(url: "https://github.com/migueldeicaza/SwiftTerm.git", from: "1.13.0"),
-        .package(url: "https://github.com/orlandos-nl/Citadel.git", from: "0.12.1"),
+        // SSH transport: Apple's official libraries only (no third-party forks).
         .package(url: "https://github.com/apple/swift-nio.git", from: "2.65.0"),
         .package(url: "https://github.com/apple/swift-nio-ssh.git", from: "0.9.0"),
+        .package(url: "https://github.com/apple/swift-crypto.git", from: "3.0.0"),
     ],
     targets: [
         .target(
             name: "HermesTerminal",
             dependencies: [
                 .product(name: "SwiftTerm", package: "SwiftTerm"),
-                .product(name: "Citadel", package: "Citadel"),
                 .product(name: "NIOCore", package: "swift-nio"),
+                .product(name: "NIOPosix", package: "swift-nio"),
                 .product(name: "NIOSSH", package: "swift-nio-ssh"),
+                .product(name: "Crypto", package: "swift-crypto"),
             ]
         ),
     ],
