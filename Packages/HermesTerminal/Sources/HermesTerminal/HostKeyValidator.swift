@@ -12,10 +12,10 @@ final class TOFUHostKeyValidator: NIOSSHClientServerAuthenticationDelegate, @unc
     init(host: String) { self.host = host }
 
     func validateHostKey(hostKey: NIOSSHPublicKey, validationCompletePromise: EventLoopPromise<Void>) {
-        var buffer = ByteBufferAllocator().buffer(capacity: 256)
-        _ = hostKey.write(to: &buffer)
-        let blob = Data(buffer.readableBytesView)
-        let fingerprint = Data(SHA256.hash(data: blob))
+        // Apple's NIOSSHPublicKey exposes no public byte serializer; the OpenSSH
+        // string ("ssh-ed25519 AAAA…") is stable across launches — fingerprint that.
+        let openSSHString = String(openSSHPublicKey: hostKey)
+        let fingerprint = Data(SHA256.hash(data: Data(openSSHString.utf8)))
 
         if let known = HostKeyStore.fingerprint(for: host) {
             if known == fingerprint {
