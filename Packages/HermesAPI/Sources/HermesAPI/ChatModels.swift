@@ -1,7 +1,7 @@
 import Foundation
 
 /// A conversation, from `GET /api/sessions` (`db.list_sessions_rich`).
-public struct ChatSession: Decodable, Identifiable, Sendable, Equatable {
+public struct ChatSession: Decodable, Identifiable, Sendable, Equatable, Hashable {
     public let id: String
     public let title: String?
     public let model: String?
@@ -62,6 +62,32 @@ public enum MessageRole: String, Sendable, Codable {
     }
 }
 
+/// A file or image attached to a message, served from
+/// `GET /api/sessions/{id}/attachments/{name}`.
+public struct Attachment: Decodable, Identifiable, Sendable, Equatable, Hashable {
+    public let name: String
+    public let url: String?
+    public let mime: String?
+
+    public var id: String { name }
+
+    enum CodingKeys: String, CodingKey { case name, url, mime }
+
+    public init(name: String, url: String? = nil, mime: String? = nil) {
+        self.name = name; self.url = url; self.mime = mime
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        name = (try? c.decode(String.self, forKey: .name)) ?? ""
+        url = try c.decodeIfPresent(String.self, forKey: .url)
+        mime = try c.decodeIfPresent(String.self, forKey: .mime)
+    }
+
+    /// True when the MIME type names an image (drives inline rendering vs. a file chip).
+    public var isImage: Bool { (mime ?? "").hasPrefix("image/") }
+}
+
 /// One stored message, from `GET /api/sessions/{id}/messages` (`db.get_messages`).
 public struct ChatMessage: Decodable, Identifiable, Sendable, Equatable {
     public let id: Int
@@ -72,13 +98,21 @@ public struct ChatMessage: Decodable, Identifiable, Sendable, Equatable {
     public let tokenCount: Int?
     public let finishReason: String?
     public let reasoning: String?
+    /// Files/images attached to this message (v12 backend). Empty when none.
+    public let attachments: [Attachment]
+    /// User feedback on an assistant message: -1 (down), 1 (up), nil (none).
+    public let feedbackScore: Int?
+    /// The message id this message is replying to, if any (v12 backend).
+    public let replyToId: Int?
 
     enum CodingKeys: String, CodingKey {
-        case id, role, content, timestamp
+        case id, role, content, timestamp, attachments
         case toolName = "tool_name"
         case tokenCount = "token_count"
         case finishReason = "finish_reason"
         case reasoning = "reasoning_content"
+        case feedbackScore = "feedback_score"
+        case replyToId = "reply_to_id"
     }
 
     public init(from decoder: Decoder) throws {
@@ -94,14 +128,23 @@ public struct ChatMessage: Decodable, Identifiable, Sendable, Equatable {
         tokenCount = try c.decodeIfPresent(Int.self, forKey: .tokenCount)
         finishReason = try c.decodeIfPresent(String.self, forKey: .finishReason)
         reasoning = try c.decodeIfPresent(String.self, forKey: .reasoning)
+        attachments = (try? c.decode([Attachment].self, forKey: .attachments)) ?? []
+        feedbackScore = try c.decodeIfPresent(Int.self, forKey: .feedbackScore)
+        replyToId = try c.decodeIfPresent(Int.self, forKey: .replyToId)
     }
 
     public init(id: Int, role: MessageRole, content: String?, toolName: String? = nil,
-                timestamp: Double? = nil, tokenCount: Int? = nil) {
+                timestamp: Double? = nil, tokenCount: Int? = nil,
+                attachments: [Attachment] = [], feedbackScore: Int? = nil, replyToId: Int? = nil) {
         self.id = id; self.role = role; self.content = content; self.toolName = toolName
         self.timestamp = timestamp; self.tokenCount = tokenCount
         self.finishReason = nil; self.reasoning = nil
+        self.attachments = attachments; self.feedbackScore = feedbackScore; self.replyToId = replyToId
     }
+
+    /// Server-assigned id (positive). Local optimistic messages use negative temp ids,
+    /// for which edit/regenerate/feedback are unavailable.
+    public var isPersisted: Bool { id > 0 }
 }
 
 struct SessionsResponse: Decodable {

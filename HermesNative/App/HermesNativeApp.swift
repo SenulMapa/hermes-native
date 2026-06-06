@@ -9,6 +9,7 @@ struct HermesNativeApp: App {
     @State private var speech = SpeechService()
     @State private var notifications = NotificationService()
     @State private var appLock = AppLock()
+    @State private var drafts = DraftStore()
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some Scene {
@@ -19,6 +20,7 @@ struct HermesNativeApp: App {
                 .environment(speech)
                 .environment(notifications)
                 .environment(appLock)
+                .environment(drafts)
                 .tint(appearance.accentColor)
                 .hermesTheme(appearance.theme)
                 .preferredColorScheme(appearance.scheme.colorScheme)

@@ -72,6 +72,54 @@ public actor HermesAPIClient {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
 
+        return try await perform(request)
+    }
+
+    /// `multipart/form-data` upload. There is no other multipart path in the app;
+    /// this builds the body by hand and reuses the same Bearer+Cookie auth as `send`.
+    /// Uses a longer timeout since payloads (images) can be large.
+    func sendMultipart<T: Decodable>(
+        _ path: String, fields: [String: String] = [:],
+        fileField: String, fileData: Data, filename: String, mime: String,
+        authenticated: Bool = true
+    ) async throws -> T {
+        guard var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false) else {
+            throw HermesError.invalidBaseURL(baseURL.absoluteString)
+        }
+        components.path = (components.path as NSString).appendingPathComponent(path)
+        guard let url = components.url else {
+            throw HermesError.invalidBaseURL(baseURL.absoluteString)
+        }
+
+        let boundary = "Boundary-\(UUID().uuidString)"
+        var body = Data()
+        let crlf = "\r\n"
+        func append(_ s: String) { body.append(s.data(using: .utf8)!) }
+        for (key, value) in fields {
+            append("--\(boundary)\(crlf)")
+            append("Content-Disposition: form-data; name=\"\(key)\"\(crlf)\(crlf)")
+            append("\(value)\(crlf)")
+        }
+        append("--\(boundary)\(crlf)")
+        append("Content-Disposition: form-data; name=\"\(fileField)\"; filename=\"\(filename)\"\(crlf)")
+        append("Content-Type: \(mime)\(crlf)\(crlf)")
+        body.append(fileData)
+        append(crlf)
+        append("--\(boundary)--\(crlf)")
+
+        var request = URLRequest(url: url, timeoutInterval: 60)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        request.httpBody = body
+        if authenticated, let token, !token.isEmpty {
+            request.setValue("access_token=\(token)", forHTTPHeaderField: "Cookie")
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        return try decode(try await perform(request))
+    }
+
+    private func perform(_ request: URLRequest) async throws -> Data {
         let data: Data
         let response: URLResponse
         do {

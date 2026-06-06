@@ -26,6 +26,8 @@ public final class HermesGateway: @unchecked Sendable {
     private var task: URLSessionWebSocketTask?
     private var nextID = 1
     private let idLock = NSLock()
+    /// Continuations awaiting a JSON-RPC *response* (not an event), keyed by request id.
+    private var pending: [Int: (Result<[String: Any], Error>) -> Void] = [:]
 
     public let events: AsyncStream<GatewayEvent>
     private let continuation: AsyncStream<GatewayEvent>.Continuation
@@ -59,13 +61,23 @@ public final class HermesGateway: @unchecked Sendable {
     public func disconnect() {
         task?.cancel(with: .goingAway, reason: nil)
         task = nil
+        failAllPending("gateway disconnected")
         continuation.finish()
     }
 
     // MARK: - Requests
 
-    public func submitPrompt(sessionID: String, text: String) {
-        request("prompt.submit", ["session_id": sessionID, "text": text])
+    /// Submit a prompt. `truncateBeforeUserOrdinal` (0-based index among user
+    /// messages) reuses the server's existing rewind path to power edit and
+    /// regenerate: history before that user turn is dropped, then this prompt runs.
+    public func submitPrompt(sessionID: String, text: String,
+                             replyTo: Int? = nil, attachmentPaths: [String] = [],
+                             truncateBeforeUserOrdinal: Int? = nil) {
+        var params: [String: Any] = ["session_id": sessionID, "text": text]
+        if let replyTo { params["reply_to"] = replyTo }
+        if !attachmentPaths.isEmpty { params["attachment_paths"] = attachmentPaths }
+        if let truncateBeforeUserOrdinal { params["truncate_before_user_ordinal"] = truncateBeforeUserOrdinal }
+        request("prompt.submit", params)
     }
 
     public func resume(sessionID: String) {
@@ -86,14 +98,44 @@ public final class HermesGateway: @unchecked Sendable {
         request("approval.respond", ["id": id, "approved": approved])
     }
 
+    /// Fork the conversation into a new session that inherits history up to now.
+    /// Awaits the JSON-RPC result and returns it (`session_id`, `title`, `parent`).
+    public func branch(sessionID: String) async throws -> [String: Any] {
+        try await requestResponse("session.branch", ["session_id": sessionID])
+    }
+
     private func request(_ method: String, _ params: [String: Any]) {
         idLock.lock(); let id = nextID; nextID += 1; idLock.unlock()
+        send(id: id, method: method, params: params)
+    }
+
+    /// Like `request`, but suspends until the matching JSON-RPC response arrives.
+    private func requestResponse(_ method: String, _ params: [String: Any]) async throws -> [String: Any] {
+        idLock.lock(); let id = nextID; nextID += 1; idLock.unlock()
+        return try await withCheckedThrowingContinuation { cont in
+            idLock.lock(); pending[id] = { cont.resume(with: $0) }; idLock.unlock()
+            send(id: id, method: method, params: params)
+        }
+    }
+
+    private func send(id: Int, method: String, params: [String: Any]) {
         let frame: [String: Any] = ["jsonrpc": "2.0", "id": id, "method": method, "params": params]
         guard let data = try? JSONSerialization.data(withJSONObject: frame),
-              let string = String(data: data, encoding: .utf8) else { return }
-        task?.send(.string(string)) { [weak self] error in
-            if let error { self?.continuation.yield(.error(error.localizedDescription)) }
+              let string = String(data: data, encoding: .utf8) else {
+            resolvePending(id: id, .failure(HermesError.network("could not encode \(method)")))
+            return
         }
+        task?.send(.string(string)) { [weak self] error in
+            if let error {
+                self?.continuation.yield(.error(error.localizedDescription))
+                self?.resolvePending(id: id, .failure(HermesError.network(error.localizedDescription)))
+            }
+        }
+    }
+
+    private func resolvePending(id: Int, _ result: Result<[String: Any], Error>) {
+        idLock.lock(); let cb = pending.removeValue(forKey: id); idLock.unlock()
+        cb?(result)
     }
 
     // MARK: - Receive
@@ -104,6 +146,7 @@ public final class HermesGateway: @unchecked Sendable {
             switch result {
             case .failure(let error):
                 self.continuation.yield(.disconnected(error.localizedDescription))
+                self.failAllPending(error.localizedDescription)
                 self.continuation.finish()
             case .success(let message):
                 switch message {
@@ -121,6 +164,16 @@ public final class HermesGateway: @unchecked Sendable {
               let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
         else { return }
 
+        // JSON-RPC *response* to one of our requests (has an id, no method).
+        if obj["method"] == nil, let id = obj["id"] as? Int {
+            if let err = obj["error"] as? [String: Any] {
+                resolvePending(id: id, .failure(HermesError.network(err["message"] as? String ?? "gateway error")))
+            } else {
+                resolvePending(id: id, .success(obj["result"] as? [String: Any] ?? [:]))
+            }
+            return
+        }
+
         if let err = obj["error"] as? [String: Any] {
             continuation.yield(.error(err["message"] as? String ?? "gateway error"))
             return
@@ -130,6 +183,11 @@ public final class HermesGateway: @unchecked Sendable {
               let type = params["type"] as? String else { return }
         let payload = params["payload"] as? [String: Any] ?? [:]
         continuation.yield(Self.map(type: type, payload: payload))
+    }
+
+    private func failAllPending(_ reason: String) {
+        idLock.lock(); let cbs = pending; pending.removeAll(); idLock.unlock()
+        for cb in cbs.values { cb(.failure(HermesError.network(reason))) }
     }
 
     static func map(type: String, payload: [String: Any]) -> GatewayEvent {

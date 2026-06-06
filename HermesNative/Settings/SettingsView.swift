@@ -1,4 +1,5 @@
 import SwiftUI
+import PhotosUI
 import HermesAPI
 import HermesGlass
 
@@ -9,6 +10,7 @@ struct SettingsView: View {
     @Environment(NotificationService.self) private var notifications
     @Environment(AppLock.self) private var appLock
     @State private var settings: SettingsStore?
+    @State private var wallpaperPhoto: PhotosPickerItem?
 
     var body: some View {
         NavigationStack {
@@ -20,6 +22,7 @@ struct SettingsView: View {
                         usageCard(settings)
                     }
                     appearanceCard
+                    wallpaperCard
                     securityCard
                     notificationsCard
                     moreCard
@@ -133,6 +136,75 @@ struct SettingsView: View {
                 }
             }
         }
+    }
+
+    private var wallpaperCard: some View {
+        GlassCard {
+            VStack(alignment: .leading, spacing: Tokens.Space.md) {
+                Text("Chat wallpaper").font(.headline)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: Tokens.Space.md) {
+                        wallpaperSwatch(isSelected: appearance.chatWallpaper == .none) {
+                            appearance.chatWallpaper = .none
+                        } content: {
+                            ZStack {
+                                Color(.secondarySystemBackground)
+                                Image(systemName: "nosign").foregroundStyle(.secondary)
+                            }
+                        }
+                        ForEach(AppearanceStore.wallpaperGradients) { g in
+                            wallpaperSwatch(isSelected: appearance.chatWallpaper == .gradient(g.id)) {
+                                appearance.chatWallpaper = .gradient(g.id)
+                            } content: {
+                                LinearGradient(colors: g.colors, startPoint: .topLeading, endPoint: .bottomTrailing)
+                            }
+                        }
+                        PhotosPicker(selection: $wallpaperPhoto, matching: .images) {
+                            wallpaperSwatchShape(isSelected: isPhotoWallpaper) {
+                                ZStack {
+                                    Color(.secondarySystemBackground)
+                                    Image(systemName: "photo").foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                    }
+                    .padding(.vertical, Tokens.Space.xs)
+                }
+            }
+        }
+        .onChange(of: wallpaperPhoto) { _, item in
+            guard let item else { return }
+            Task {
+                if let data = try? await item.loadTransferable(type: Data.self) {
+                    appearance.setPhotoWallpaper(data)
+                }
+                wallpaperPhoto = nil
+            }
+        }
+    }
+
+    private var isPhotoWallpaper: Bool {
+        if case .photo = appearance.chatWallpaper { return true }
+        return false
+    }
+
+    private func wallpaperSwatch<Content: View>(
+        isSelected: Bool, select: @escaping () -> Void, @ViewBuilder content: () -> Content
+    ) -> some View {
+        Button(action: select) { wallpaperSwatchShape(isSelected: isSelected, content: content) }
+            .buttonStyle(.plain)
+    }
+
+    private func wallpaperSwatchShape<Content: View>(
+        isSelected: Bool, @ViewBuilder content: () -> Content
+    ) -> some View {
+        content()
+            .frame(width: 48, height: 72)
+            .clipShape(RoundedRectangle(cornerRadius: Tokens.Radius.control))
+            .overlay {
+                RoundedRectangle(cornerRadius: Tokens.Radius.control)
+                    .strokeBorder(isSelected ? appearance.accentColor : .clear, lineWidth: 3)
+            }
     }
 
     private var notificationsCard: some View {
