@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!--
+        Hermes Native — Info.plist
+
+        Allow plain HTTP to RFC1918 / link-local / Tailscale / .local hosts so
+        the app can talk to a self-hosted Hermes server that's only reachable
+        on the LAN or the tailnet. Public-internet HTTP is still blocked by
+        App Transport Security (the ATS `NSAllowsLocalNetworking` exception is
+        scoped to non-public domains, per Apple's docs).
+    -->
+    <key>NSAppTransportSecurity</key>
+    <dict>
+        <key>NSAllowsLocalNetworking</key>
+        <true/>
+    </dict>
+</dict>
+</plist>
