@@ -5,12 +5,16 @@ import HermesGlass
 @main
 struct HermesNativeApp: App {
     @State private var model = AppModel(store: KeychainCredentialStore())
+    @State private var appearance = AppearanceStore()
 
     var body: some Scene {
         WindowGroup {
             RootView()
                 .environment(model)
-                .tint(Tokens.accent)
+                .environment(appearance)
+                .tint(appearance.accentColor)
+                .hermesTheme(appearance.theme)
+                .preferredColorScheme(appearance.scheme.colorScheme)
         }
     }
 }

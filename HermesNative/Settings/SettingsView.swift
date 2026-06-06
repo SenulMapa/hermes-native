@@ -1,23 +1,42 @@
 import SwiftUI
+import HermesAPI
 import HermesGlass
 
-/// Phase 0 settings: connection status, server info, version, sign-out.
-/// Expands into the full PRD §15 settings in Phase 3.
+/// Settings: connection, model selection, usage/cost, appearance, about.
 struct SettingsView: View {
     @Environment(AppModel.self) private var model
+    @Environment(AppearanceStore.self) private var appearance
+    @State private var settings: SettingsStore?
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: Tokens.Space.lg) {
                     connectionCard
+                    if let settings {
+                        modelCard(settings)
+                        usageCard(settings)
+                    }
+                    appearanceCard
                     aboutCard
                 }
                 .padding(Tokens.Space.lg)
             }
             .navigationTitle("Settings")
-            .refreshable { await model.refresh() }
+            .refreshable { await reload() }
+            .task {
+                if settings == nil, let cred = model.credential {
+                    let s = SettingsStore(credential: cred)
+                    settings = s
+                    await s.load()
+                }
+            }
         }
+    }
+
+    private func reload() async {
+        await model.refresh()
+        await settings?.load()
     }
 
     private var connectionCard: some View {
@@ -26,14 +45,11 @@ struct SettingsView: View {
                 Text("Connection").font(.headline)
                 statusPill
                 if let url = model.credential?.baseURL {
-                    LabeledContent("Server", value: url.absoluteString)
-                        .font(.subheadline)
+                    LabeledContent("Server", value: url.absoluteString).font(.subheadline)
                 }
                 HStack(spacing: Tokens.Space.md) {
-                    Button("Re-check") { Task { await model.refresh() } }
-                        .buttonStyle(.glass)
-                    Button("Sign out", role: .destructive) { model.signOut() }
-                        .buttonStyle(.glass)
+                    Button("Re-check") { Task { await model.refresh() } }.buttonStyle(.glass)
+                    Button("Sign out", role: .destructive) { model.signOut() }.buttonStyle(.glass)
                 }
                 .padding(.top, Tokens.Space.xs)
             }
@@ -50,6 +66,70 @@ struct SettingsView: View {
         }
     }
 
+    private func modelCard(_ settings: SettingsStore) -> some View {
+        GlassCard {
+            VStack(alignment: .leading, spacing: Tokens.Space.sm) {
+                Text("Model").font(.headline)
+                NavigationLink {
+                    ModelsView(store: settings)
+                } label: {
+                    HStack {
+                        Text(settings.currentModel ?? "Default")
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Image(systemName: "chevron.right").font(.caption).foregroundStyle(.tertiary)
+                    }
+                }
+                if settings.models.isEmpty && !settings.loading {
+                    Text("No model catalog returned by the server.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder private func usageCard(_ settings: SettingsStore) -> some View {
+        if !settings.usage.isEmpty {
+            GlassCard {
+                VStack(alignment: .leading, spacing: Tokens.Space.sm) {
+                    Text("Usage").font(.headline)
+                    ForEach(settings.usage.sorted(by: { $0.key < $1.key }), id: \.key) { key, value in
+                        LabeledContent(prettify(key), value: format(key: key, value: value))
+                            .font(.subheadline)
+                    }
+                }
+            }
+        }
+    }
+
+    private var appearanceCard: some View {
+        @Bindable var appearance = appearance
+        return GlassCard {
+            VStack(alignment: .leading, spacing: Tokens.Space.md) {
+                Text("Appearance").font(.headline)
+                Picker("Theme", selection: $appearance.scheme) {
+                    ForEach(AppearanceStore.Scheme.allCases) { Text($0.label).tag($0) }
+                }
+                .pickerStyle(.segmented)
+
+                Text("Accent").font(.subheadline).foregroundStyle(.secondary)
+                HStack(spacing: Tokens.Space.md) {
+                    ForEach(AppearanceStore.accents) { accent in
+                        Circle()
+                            .fill(accent.color)
+                            .frame(width: 30, height: 30)
+                            .overlay {
+                                if accent.id == appearance.accentName {
+                                    Image(systemName: "checkmark").font(.caption.bold()).foregroundStyle(.white)
+                                }
+                            }
+                            .onTapGesture { appearance.accentName = accent.id }
+                    }
+                }
+            }
+        }
+    }
+
     private var aboutCard: some View {
         GlassCard {
             VStack(alignment: .leading, spacing: Tokens.Space.sm) {
@@ -60,6 +140,20 @@ struct SettingsView: View {
                     .font(.footnote).foregroundStyle(.secondary)
             }
         }
+    }
+
+    // MARK: - helpers
+
+    private func prettify(_ key: String) -> String {
+        key.replacingOccurrences(of: "_", with: " ").capitalized
+    }
+
+    private func format(key: String, value: Double) -> String {
+        if key.contains("cost") || key.contains("dollar") || key.contains("usd") {
+            return String(format: "$%.2f", value)
+        }
+        if value >= 1000 { return String(format: "%.0f", value) }
+        return value == value.rounded() ? String(Int(value)) : String(format: "%.2f", value)
     }
 
     static var appVersion: String {
