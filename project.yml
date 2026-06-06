@@ -33,6 +33,10 @@ targets:
     platform: iOS
     sources:
       - path: HermesNative
+        excludes:
+          - "Info.plist"
+    info:
+      path: HermesNative/Info.plist
     dependencies:
       - package: HermesGlass
       - package: HermesAPI
@@ -40,7 +44,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.senulmapa.hermesnative
-        GENERATE_INFOPLIST_FILE: "YES"
+        GENERATE_INFOPLIST_FILE: "NO"
         INFOPLIST_KEY_CFBundleDisplayName: "Hermes"
         INFOPLIST_KEY_NSMicrophoneUsageDescription: "Hermes uses the microphone for voice input to your agent."
         INFOPLIST_KEY_NSSpeechRecognitionUsageDescription: "Hermes transcribes your speech on-device for voice messages."
