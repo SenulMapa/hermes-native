@@ -28,31 +28,46 @@ public actor HermesAPIClient {
         try await get("/api/auth/me", authenticated: true)
     }
 
-    // MARK: - Request plumbing
+    // MARK: - Request plumbing (internal — shared with feature extensions)
 
-    private func get<T: Decodable>(_ path: String, authenticated: Bool) async throws -> T {
-        let data = try await rawGet(path, authenticated: authenticated)
-        do {
-            return try JSONDecoder().decode(T.self, from: data)
-        } catch {
-            throw HermesError.decoding(String(describing: error))
-        }
+    func get<T: Decodable>(_ path: String, query: [URLQueryItem] = [], authenticated: Bool = true) async throws -> T {
+        try decode(try await send("GET", path, query: query, body: nil, authenticated: authenticated))
     }
 
-    private func rawGet(_ path: String, authenticated: Bool) async throws -> Data {
+    @discardableResult
+    func sendJSON<T: Decodable>(
+        _ method: String, _ path: String, body: Encodable? = nil, authenticated: Bool = true
+    ) async throws -> T {
+        let data = try body.map { try JSONEncoder().encode(AnyEncodable($0)) }
+        return try decode(try await send(method, path, query: [], body: data, authenticated: authenticated))
+    }
+
+    private func decode<T: Decodable>(_ data: Data) throws -> T {
+        do { return try JSONDecoder().decode(T.self, from: data) }
+        catch { throw HermesError.decoding(String(describing: error)) }
+    }
+
+    func send(
+        _ method: String, _ path: String, query: [URLQueryItem] = [],
+        body: Data? = nil, authenticated: Bool
+    ) async throws -> Data {
         guard var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false) else {
             throw HermesError.invalidBaseURL(baseURL.absoluteString)
         }
         components.path = (components.path as NSString).appendingPathComponent(path)
+        if !query.isEmpty { components.queryItems = query }
         guard let url = components.url else {
             throw HermesError.invalidBaseURL(baseURL.absoluteString)
         }
 
-        var request = URLRequest(url: url, timeoutInterval: 10)
-        request.httpMethod = "GET"
+        var request = URLRequest(url: url, timeoutInterval: 20)
+        request.httpMethod = method
         request.setValue("application/json", forHTTPHeaderField: "Accept")
+        if let body {
+            request.httpBody = body
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        }
         if authenticated, let token, !token.isEmpty {
-            // Hermes validates a session cookie; also send Bearer for forward-compat.
             request.setValue("access_token=\(token)", forHTTPHeaderField: "Cookie")
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
@@ -69,12 +84,21 @@ public actor HermesAPIClient {
             throw HermesError.network("Non-HTTP response")
         }
         switch http.statusCode {
-        case 200...299:
-            return data
-        case 401, 403:
-            throw HermesError.unauthorized
-        default:
-            throw HermesError.http(status: http.statusCode)
+        case 200...299: return data
+        case 401, 403:  throw HermesError.unauthorized
+        default:        throw HermesError.http(status: http.statusCode)
         }
     }
+
+    /// The configured base URL (used to derive the WebSocket URL).
+    public nonisolated var serverBaseURL: URL { baseURL }
+    /// The session token, if any (used by the gateway socket).
+    public nonisolated var serverToken: String? { token }
+}
+
+/// Type-erased Encodable so `sendJSON` can take any body.
+struct AnyEncodable: Encodable {
+    private let encodeFunc: (Encoder) throws -> Void
+    init(_ wrapped: Encodable) { encodeFunc = wrapped.encode }
+    func encode(to encoder: Encoder) throws { try encodeFunc(encoder) }
 }

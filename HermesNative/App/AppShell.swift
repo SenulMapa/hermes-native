@@ -8,12 +8,7 @@ struct AppShell: View {
     var body: some View {
         TabView {
             Tab("Inbox", systemImage: "tray.full") {
-                PlaceholderView(
-                    title: "Inbox",
-                    systemImage: "tray.full",
-                    detail: "Chat with Valerie, Maya & Vigil.",
-                    phase: "Phase 1"
-                )
+                InboxView()
             }
             Tab("Terminal", systemImage: "terminal") {
                 PlaceholderView(

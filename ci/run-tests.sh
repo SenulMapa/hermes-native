@@ -35,7 +35,11 @@ if [ -z "$DEST_ID" ]; then
   exit 1
 fi
 
-echo "Testing on iOS Simulator id=$DEST_ID"
+echo "::group::HermesAPI package tests (host)"
+swift test --package-path Packages/HermesAPI
+echo "::endgroup::"
+
+echo "Testing app on iOS Simulator id=$DEST_ID"
 xcodebuild test \
   -project "$PROJECT" \
   -scheme "$SCHEME" \
